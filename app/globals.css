@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/* DiffArena — "print registration" tokens. Rules: docs/design-system.md */
+@theme {
+  --color-mat: #1d3a32;
+  --color-mat-line: #24453b;
+  --color-mat-major: #2c5146;
+  --color-ink: #12181a;
+  --color-ink-2: #1a2225;
+  --color-rule: #3d6b5d;
+  --color-paper: #eef2ef;
+  --color-muted: rgb(238 242 239 / 0.64);
+  --color-plate-a: #00aeef;
+  --color-plate-b: #ec008c;
+  --color-register: #fff200;
+
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --radius-panel: 2px;
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+    background: var(--color-mat);
+    color: var(--color-paper);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-register);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: rgb(255 242 0 / 0.35);
+  }
+}
+
+@utility font-expanded {
+  font-family: var(--font-sans);
+  font-variation-settings: "wdth" 125;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Cutting-mat grid — only behind canvases */
+@utility mat-grid {
+  background-color: var(--color-mat);
+  background-image:
+    linear-gradient(var(--color-mat-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-mat-major) 1px, transparent 1px),
+    linear-gradient(var(--color-mat-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-mat-line) 1px, transparent 1px);
+  background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+}
+
+/* L-shaped crop marks just outside an element's corners */
+@utility crop-marks {
+  position: relative;
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -7px;
+    pointer-events: none;
+    background:
+      linear-gradient(var(--color-rule), var(--color-rule)) top left / 8px 1px no-repeat,
+      linear-gradient(var(--color-rule), var(--color-rule)) top left / 1px 8px no-repeat,
+      linear-gradient(var(--color-rule), var(--color-rule)) top right / 8px 1px no-repeat,
+      linear-gradient(var(--color-rule), var(--color-rule)) top right / 1px 8px no-repeat;
+  }
+  &::after {
+    background:
+      linear-gradient(var(--color-rule), var(--color-rule)) bottom left / 8px 1px no-repeat,
+      linear-gradient(var(--color-rule), var(--color-rule)) bottom left / 1px 8px no-repeat,
+      linear-gradient(var(--color-rule), var(--color-rule)) bottom right / 8px 1px no-repeat,
+      linear-gradient(var(--color-rule), var(--color-rule)) bottom right / 1px 8px no-repeat;
+  }
+}
+
+/* One orchestrated moment: plates slide in and lock into register */
+@keyframes plate-in-left {
+  from { transform: translateX(-24px); opacity: 0; }
+}
+@keyframes plate-in-right {
+  from { transform: translateX(24px); opacity: 0; }
+}
+.plate-in-left { animation: plate-in-left 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.plate-in-right { animation: plate-in-right 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .plate-in-left,
+  .plate-in-right { animation: none; }
+  *, *::before, *::after { transition-duration: 0ms !important; }
+}
