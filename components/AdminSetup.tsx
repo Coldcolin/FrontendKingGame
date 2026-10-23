@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, ApiError, fileUrl } from "@/lib/api";
+import { api, ApiError, fileUrl, hostToken } from "@/lib/api";
 import type { ChallengeDTO, Slot } from "@/lib/contracts";
 import { Canvas } from "./Canvas";
-import { AppShell, Avatar, Button, Crosshair, Panel, plateBorder, plateText } from "./ui";
+import { HostLogin } from "./HostLogin";
+import { AppShell, Avatar, Button, CenterMessage, Crosshair, Panel, plateBorder, plateText } from "./ui";
 
 interface Contender {
   name: string;
@@ -24,7 +25,17 @@ const DURATIONS = [
 
 export const linksKey = (id: string) => `diffarena:links:${id}`;
 
-function ContenderRow({ slot, value, onChange }: { slot: Slot; value: Contender; onChange: (c: Contender) => void }) {
+function ContenderRow({
+  slot,
+  value,
+  onChange,
+  onSignedOut,
+}: {
+  slot: Slot;
+  value: Contender;
+  onChange: (c: Contender) => void;
+  onSignedOut: () => void;
+}) {
   const file = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +49,7 @@ function ContenderRow({ slot, value, onChange }: { slot: Slot; value: Contender;
       const { url } = await api.uploadAvatar(f);
       onChange({ ...value, avatarUrl: url });
     } catch (e) {
+      if ((e as ApiError).status === 401) return onSignedOut();
       setError((e as ApiError).message);
     } finally {
       setUploading(false);
@@ -96,6 +108,17 @@ export function AdminSetup() {
   const [uploading, setUploading] = useState(false);
   const [launching, setLaunching] = useState(false);
   const uploadRef = useRef<HTMLInputElement>(null);
+  // "expired" keeps the form filled in while the host signs in again.
+  const [host, setHost] = useState<"checking" | "in" | "out" | "expired">("checking");
+  const signedOut = () => setHost("expired");
+
+  // Asked even without a token: a dev server with no password lets everyone in.
+  useEffect(() => {
+    api.session().then(
+      (r) => setHost(r.valid ? "in" : "out"),
+      () => setHost("out"),
+    );
+  }, []);
 
   useEffect(() => {
     api.challenges().then(
@@ -115,6 +138,7 @@ export function AdminSetup() {
       setChallenges((list) => [...(list ?? []), c]);
       setSelected(c.id);
     } catch (e) {
+      if ((e as ApiError).status === 401) return signedOut();
       setFormError((e as ApiError).message);
     } finally {
       setUploading(false);
@@ -139,16 +163,34 @@ export function AdminSetup() {
       try { localStorage.setItem(linksKey(match.id), JSON.stringify(links)); } catch {}
       router.push(links.admin);
     } catch (e) {
-      setFormError((e as ApiError).message);
       setLaunching(false);
+      if ((e as ApiError).status === 401) return signedOut();
+      setFormError((e as ApiError).message);
     }
   }
 
   const current = challenges?.find((c) => c.id === selected);
 
+  if (host === "checking") return <AppShell><CenterMessage title="Loading…" /></AppShell>;
+  if (host !== "in") return <HostLogin expired={host === "expired"} onSignedIn={() => setHost("in")} />;
+
   return (
     <AppShell
-      nav={<span className="text-[14px] text-muted">Set up a match</span>}
+      nav={
+        <span className="flex items-center gap-4 text-[14px] text-muted">
+          Set up a match
+          <button
+            type="button"
+            onClick={() => {
+              hostToken.clear();
+              setHost("out");
+            }}
+            className="hover:text-paper"
+          >
+            Sign out
+          </button>
+        </span>
+      }
       footer={
         <>
           <p className="text-[14px] text-muted" role="status">
@@ -168,7 +210,7 @@ export function AdminSetup() {
               <p className="mt-1 text-muted">Pick two contenders and a target. Setup takes under a minute.</p>
             </div>
             <div className="my-8 flex flex-col">
-              <ContenderRow slot="A" value={players.A} onChange={(c) => setPlayers((p) => ({ ...p, A: c }))} />
+              <ContenderRow slot="A" value={players.A} onChange={(c) => setPlayers((p) => ({ ...p, A: c }))} onSignedOut={signedOut} />
               {/* Cyan and magenta rules meet at the registration mark */}
               <div className="flex items-center gap-4 py-3 pl-[31px]" aria-hidden>
                 <div className="flex flex-col items-center">
@@ -178,7 +220,7 @@ export function AdminSetup() {
                 </div>
                 <span className="font-expanded text-[22px] text-paper/80">VS</span>
               </div>
-              <ContenderRow slot="B" value={players.B} onChange={(c) => setPlayers((p) => ({ ...p, B: c }))} />
+              <ContenderRow slot="B" value={players.B} onChange={(c) => setPlayers((p) => ({ ...p, B: c }))} onSignedOut={signedOut} />
             </div>
             <div className="mt-auto border-t border-rule/60 pt-5">
               <p className="mb-2 text-[13px] text-muted" id="duration-label">Match length</p>
